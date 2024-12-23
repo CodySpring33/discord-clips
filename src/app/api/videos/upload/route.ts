@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   try {
     const ip = headers().get('x-forwarded-for') || 'unknown';
     
-    if (!checkRateLimit(ip)) {
+    const isAllowed = await checkRateLimit(ip);
+    if (!isAllowed) {
       return new NextResponse(
         JSON.stringify({ message: 'Upload limit exceeded. Please try again later.' }),
         { status: 429 }

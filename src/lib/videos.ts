@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { kv } from '@vercel/kv';
 
 export interface Video {
   id: string;
@@ -12,48 +11,67 @@ export interface Video {
   createdAt: string;
 }
 
-const DATA_DIR = '/app/data';
-const VIDEOS_FILE = path.join(DATA_DIR, 'videos.json');
+export async function getAllVideos(): Promise<Video[]> {
+  try {
+    // Get all video IDs
+    const videoIds = await kv.smembers('video_ids');
+    if (!Array.isArray(videoIds) || !videoIds.length) return [];
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+    // Get all videos in parallel
+    const videos = await Promise.all(
+      videoIds.map((id) => kv.get<Video>(`video:${id}`))
+    );
+
+    // Filter out any null values and sort by date
+    return videos
+      .filter((video: Video | null): video is Video => video !== null)
+      .sort((a: Video, b: Video) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (error) {
+    console.error('Failed to get videos:', error);
+    return [];
+  }
 }
 
-// Initialize videos file if it doesn't exist
-if (!fs.existsSync(VIDEOS_FILE)) {
-  fs.writeFileSync(VIDEOS_FILE, JSON.stringify([]));
+export async function getVideo(id: string): Promise<Video | null> {
+  try {
+    return await kv.get<Video>(`video:${id}`);
+  } catch (error) {
+    console.error('Failed to get video:', error);
+    return null;
+  }
 }
 
-export function getAllVideos(): Video[] {
-  const data = fs.readFileSync(VIDEOS_FILE, 'utf-8');
-  return JSON.parse(data);
-}
-
-export function getVideo(id: string): Video | null {
-  const videos = getAllVideos();
-  return videos.find(v => v.id === id) ?? null;
-}
-
-export function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Video {
-  const videos = getAllVideos();
-  const newVideo = {
+export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Promise<Video> {
+  const newVideo: Video = {
     ...video,
     views: 0,
     createdAt: new Date().toISOString(),
   };
-  
-  videos.push(newVideo);
-  fs.writeFileSync(VIDEOS_FILE, JSON.stringify(videos, null, 2));
-  return newVideo;
+
+  try {
+    // Store the video
+    await kv.set(`video:${video.id}`, newVideo);
+    // Add the ID to the set of all video IDs
+    await kv.sadd('video_ids', video.id);
+    return newVideo;
+  } catch (error) {
+    console.error('Failed to create video:', error);
+    throw error;
+  }
 }
 
-export function incrementViews(id: string): void {
-  const videos = getAllVideos();
-  const index = videos.findIndex(v => v.id === id);
-  
-  if (index !== -1) {
-    videos[index].views += 1;
-    fs.writeFileSync(VIDEOS_FILE, JSON.stringify(videos, null, 2));
+export async function incrementViews(id: string): Promise<void> {
+  try {
+    await kv.incr(`video:${id}:views`);
+    
+    // Update the views in the main video object
+    const video = await getVideo(id);
+    if (video) {
+      video.views = (await kv.get<number>(`video:${id}:views`)) ?? 0;
+      await kv.set(`video:${id}`, video);
+    }
+  } catch (error) {
+    console.error('Failed to increment views:', error);
+    throw error;
   }
 } 
