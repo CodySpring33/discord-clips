@@ -1,35 +1,44 @@
+import { kv } from '@vercel/kv';
+
 interface RateLimit {
   count: number;
   resetTime: number;
 }
 
-const rateLimits = new Map<string, RateLimit>();
-
 const UPLOAD_LIMIT = 10; // uploads per day
-const UPLOAD_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const UPLOAD_WINDOW = 24 * 60 * 60; // 24 hours in seconds
 
-export function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const limit = rateLimits.get(ip);
+export async function checkRateLimit(ip: string): Promise<boolean> {
+  const now = Math.floor(Date.now() / 1000); // Convert to seconds
+  const key = `ratelimit:${ip}`;
 
-  // Clean up expired entries
-  if (limit && now > limit.resetTime) {
-    rateLimits.delete(ip);
-  }
+  try {
+    // Get current limit
+    const limit = await kv.get<RateLimit>(key);
 
-  if (!rateLimits.has(ip)) {
-    rateLimits.set(ip, {
+    // If limit exists and not expired, increment count
+    if (limit && now < limit.resetTime) {
+      if (limit.count >= UPLOAD_LIMIT) {
+        return false;
+      }
+
+      await kv.hset(key, {
+        count: limit.count + 1,
+        resetTime: limit.resetTime,
+      });
+      await kv.expire(key, UPLOAD_WINDOW); // Ensure TTL is set
+      return true;
+    }
+
+    // Create new limit
+    await kv.hset(key, {
       count: 1,
       resetTime: now + UPLOAD_WINDOW,
     });
+    await kv.expire(key, UPLOAD_WINDOW);
     return true;
+  } catch (error) {
+    console.error('Rate limit error:', error);
+    return true; // Allow on error to prevent blocking legitimate users
   }
-
-  const currentLimit = rateLimits.get(ip)!;
-  if (currentLimit.count >= UPLOAD_LIMIT) {
-    return false;
-  }
-
-  currentLimit.count += 1;
-  return true;
 } 

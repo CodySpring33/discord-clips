@@ -36,7 +36,7 @@ export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const video = getVideo(params.id);
+  const video = await getVideo(params.id);
 
   if (!video) {
     return {
@@ -74,7 +74,7 @@ export async function generateMetadata(
 }
 
 export default async function VideoPage({ params }: Props): Promise<JSX.Element> {
-  const video = getVideo(params.id);
+  const video = await getVideo(params.id);
 
   if (!video) {
     notFound();
