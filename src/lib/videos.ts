@@ -14,20 +14,18 @@ export interface Video {
 export async function getAllVideos(): Promise<Video[]> {
   try {
     // Get all video IDs
-    const videoIds = await kv.smembers<string>('video_ids');
-    if (!videoIds?.length) return [];
+    const videoIds = await kv.smembers('video_ids');
+    if (!Array.isArray(videoIds) || !videoIds.length) return [];
 
     // Get all videos in parallel
     const videos = await Promise.all(
-      videoIds.map((id: string) => kv.get<Video>(`video:${id}`))
+      videoIds.map((id) => kv.get<Video>(`video:${id}`))
     );
 
     // Filter out any null values and sort by date
     return videos
-      .filter((v): v is Video => v !== null)
-      .sort((a: Video, b: Video) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      .filter((video: Video | null): video is Video => video !== null)
+      .sort((a: Video, b: Video) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Failed to get videos:', error);
     return [];
