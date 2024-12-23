@@ -48,8 +48,11 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/src ./src
 
-# Create data directory
-RUN mkdir -p /app/data
+# Create data directory with proper permissions
+RUN mkdir -p /app/data && \
+    chown -R node:node /app
+
+USER node
 
 EXPOSE 3000
 
