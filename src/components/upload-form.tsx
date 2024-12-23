@@ -3,9 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { z } from 'zod';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
+import { Button, Input, Textarea } from '@/components/ui';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -20,7 +18,14 @@ const uploadRequestSchema = z.object({
   size: z.number().max(MAX_FILE_SIZE, 'File size must be less than 100MB'),
 });
 
-export function UploadForm() {
+interface UploadResponse {
+  url: string;
+  fields: Record<string, string>;
+  id: string;
+  message?: string;
+}
+
+export function UploadForm(): JSX.Element {
   const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
   const [title, setTitle] = useState('');
@@ -55,7 +60,7 @@ export function UploadForm() {
     maxSize: MAX_FILE_SIZE,
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!file || isUploading) return;
 
@@ -77,7 +82,7 @@ export function UploadForm() {
         body: JSON.stringify(validation),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as UploadResponse;
 
       if (!response.ok) {
         throw new Error(data.message || 'Failed to get upload URL');
@@ -87,7 +92,7 @@ export function UploadForm() {
 
       const formData = new FormData();
       Object.entries(fields).forEach(([key, value]) => {
-        formData.append(key, value as string);
+        formData.append(key, value);
       });
       formData.append('file', file);
 
@@ -102,7 +107,7 @@ export function UploadForm() {
 
       toast.success('Video uploaded successfully!');
       router.push(`/videos/${id}`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -146,7 +151,7 @@ export function UploadForm() {
         type="text"
         placeholder="Title"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
         required
         maxLength={100}
       />
@@ -154,7 +159,7 @@ export function UploadForm() {
       <Textarea
         placeholder="Description (optional)"
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
         maxLength={500}
       />
 

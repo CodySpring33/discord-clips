@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+import { getVideo } from '@/lib/videos';
 import { VideoPlayer } from '@/components/video-player';
 
 export const dynamic = 'force-dynamic';
@@ -11,21 +11,8 @@ interface Props {
   };
 }
 
-export default async function VideoPage({ params }: Props) {
-  let video = null;
-
-  try {
-    video = await prisma.video.findUnique({
-      where: { id: params.id },
-    });
-  } catch (error) {
-    console.error('Failed to fetch video:', error);
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-500">Failed to load video. Please try again later.</p>
-      </div>
-    );
-  }
+export default async function VideoPage({ params }: Props): Promise<JSX.Element> {
+  const video = getVideo(params.id);
 
   if (!video) {
     notFound();
