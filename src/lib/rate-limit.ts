@@ -14,28 +14,18 @@ export async function checkRateLimit(ip: string): Promise<boolean> {
 
   try {
     // Get current limit
-    const limit = await kv.get<RateLimit>(key);
-
-    // If limit exists and not expired, increment count
-    if (limit && now < limit.resetTime) {
-      if (limit.count >= UPLOAD_LIMIT) {
-        return false;
-      }
-
-      await kv.hset(key, {
-        count: limit.count + 1,
-        resetTime: limit.resetTime,
-      });
-      await kv.expire(key, UPLOAD_WINDOW); // Ensure TTL is set
-      return true;
+    const count = await kv.incr(key);
+    
+    // If this is the first request, set expiry
+    if (count === 1) {
+      await kv.expire(key, UPLOAD_WINDOW);
     }
 
-    // Create new limit
-    await kv.hset(key, {
-      count: 1,
-      resetTime: now + UPLOAD_WINDOW,
-    });
-    await kv.expire(key, UPLOAD_WINDOW);
+    // Check if over limit
+    if (count > UPLOAD_LIMIT) {
+      return false;
+    }
+
     return true;
   } catch (error) {
     console.error('Rate limit error:', error);
