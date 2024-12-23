@@ -1,26 +1,30 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Video } from '@prisma/client';
+import type { Video } from '@/lib/videos';
 
 interface VideoPlayerProps {
   video: Video;
 }
 
-export function VideoPlayer({ video }: VideoPlayerProps) {
+export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const updateViews = async () => {
       try {
         await fetch(`/api/videos/${video.id}/view`, { method: 'POST' });
-      } catch (error) {
-        console.error('Failed to update views:', error);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error('Failed to update views:', error.message);
+        } else {
+          console.error('Failed to update views:', error);
+        }
       }
     };
 
     const handlePlay = () => {
-      updateViews();
+      void updateViews();
     };
 
     const videoElement = videoRef.current;

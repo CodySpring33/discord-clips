@@ -1,24 +1,11 @@
-import { prisma } from '@/lib/prisma'
-import { Video } from '@prisma/client'
+import { getAllVideos } from '@/lib/videos';
+import type { Video } from '@/lib/videos';
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export default async function Home() {
-  let videos: Video[] = []
-  
-  try {
-    videos = await prisma.video.findMany({
-      where: {
-        status: 'READY'
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-  } catch (error) {
-    console.error('Failed to fetch videos:', error)
-  }
+export default async function Home(): Promise<JSX.Element> {
+  const videos = getAllVideos();
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
@@ -32,13 +19,16 @@ export default async function Home() {
         </a>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-          {videos.map((video: Video) => (
+          {videos.map((video) => (
             <div key={video.id} className="border rounded p-4">
               <h2 className="text-xl font-bold">{video.title}</h2>
               <p className="text-gray-600">{video.description}</p>
+              <div className="mt-2 text-sm text-gray-500">
+                {video.views.toLocaleString()} views
+              </div>
               <a 
                 href={`/videos/${video.id}`}
-                className="text-blue-500 hover:text-blue-700"
+                className="text-blue-500 hover:text-blue-700 mt-2 inline-block"
               >
                 View Video
               </a>
@@ -47,5 +37,5 @@ export default async function Home() {
         </div>
       </div>
     </main>
-  )
+  );
 }
