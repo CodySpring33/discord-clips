@@ -31,6 +31,7 @@ export function UploadForm(): JSX.Element {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -66,6 +67,7 @@ export function UploadForm(): JSX.Element {
 
     try {
       setIsUploading(true);
+      setUploadProgress(0);
 
       const validation = uploadRequestSchema.parse({
         title,
@@ -96,14 +98,32 @@ export function UploadForm(): JSX.Element {
       });
       formData.append('file', file);
 
-      const uploadResponse = await fetch(url, {
-        method: 'POST',
-        body: formData,
-      });
+      // Use XMLHttpRequest for upload progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(progress);
+          }
+        };
 
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error('Upload failed'));
+        };
+
+        xhr.open('POST', url);
+        xhr.send(formData);
+      });
 
       toast.success('Video uploaded successfully!');
       router.push(`/videos/${id}`);
@@ -118,6 +138,7 @@ export function UploadForm(): JSX.Element {
       }
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -164,7 +185,7 @@ export function UploadForm(): JSX.Element {
       />
 
       <Button type="submit" disabled={!file || !title || isUploading}>
-        {isUploading ? 'Uploading...' : 'Upload'}
+        {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload'}
       </Button>
     </form>
   );
