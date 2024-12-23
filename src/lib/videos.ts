@@ -12,7 +12,7 @@ export interface Video {
   createdAt: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = '/app/data';
 const VIDEOS_FILE = path.join(DATA_DIR, 'videos.json');
 
 // Ensure data directory exists
