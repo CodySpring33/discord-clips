@@ -1,5 +1,4 @@
 import { getAllVideos } from '@/lib/videos';
-import type { Video } from '@/lib/videos';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

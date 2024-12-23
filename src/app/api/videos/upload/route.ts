@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const key = `videos/${id}${validation.contentType === 'video/mp4' ? '.mp4' : '.webm'}`;
     const { url, fields } = await createPresignedUploadUrl({ key, contentType: validation.contentType });
 
-    const video = createVideo({
+    await createVideo({
       id,
       title: validation.title,
       description: validation.description ?? null,
