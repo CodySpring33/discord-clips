@@ -10,16 +10,35 @@ interface VideoPlayerProps {
 export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
 
   useEffect(() => {
     const getVideoUrl = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
         const response = await fetch(`/api/videos/${video.id}/url`);
         if (!response.ok) throw new Error('Failed to get video URL');
         const { url } = await response.json();
         setVideoUrl(url);
+        
+        // Try to get thumbnail
+        try {
+          const thumbnailResponse = await fetch(`/api/videos/${video.id}/thumbnail`);
+          if (thumbnailResponse.ok) {
+            const { url: thumbUrl } = await thumbnailResponse.json();
+            setThumbnailUrl(thumbUrl);
+          }
+        } catch (e) {
+          console.warn('Failed to load thumbnail:', e);
+        }
       } catch (error) {
         console.error('Failed to get video URL:', error);
+        setError('Failed to load video. Please try again later.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -31,11 +50,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
       try {
         await fetch(`/api/videos/${video.id}/view`, { method: 'POST' });
       } catch (error: unknown) {
-        if (error instanceof Error) {
-          console.error('Failed to update views:', error.message);
-        } else {
-          console.error('Failed to update views:', error);
-        }
+        console.error('Failed to update views:', error);
       }
     };
 
@@ -43,17 +58,38 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
       void updateViews();
     };
 
+    const handleError = (e: Event) => {
+      const videoElement = e.target as HTMLVideoElement;
+      if (videoElement.error) {
+        setError(`Failed to play video: ${videoElement.error.message}`);
+      }
+    };
+
     const videoElement = videoRef.current;
     if (videoElement) {
       videoElement.addEventListener('play', handlePlay);
+      videoElement.addEventListener('error', handleError);
       return () => {
         videoElement.removeEventListener('play', handlePlay);
+        videoElement.removeEventListener('error', handleError);
       };
     }
   }, [video.id]);
 
-  if (!videoUrl) {
-    return <div>Loading...</div>;
+  if (error) {
+    return (
+      <div className="flex items-center justify-center w-full h-full bg-gray-900 text-white p-4 rounded">
+        <p className="text-center">{error}</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center w-full h-full bg-gray-900 text-white p-4 rounded">
+        <p className="text-center">Loading video...</p>
+      </div>
+    );
   }
 
   return (
@@ -63,8 +99,27 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
       controls
       preload="metadata"
       playsInline
+      poster={thumbnailUrl}
+      onError={(e) => {
+        const target = e.currentTarget;
+        if (target.error) {
+          setError(`Failed to play video: ${target.error.message}`);
+        }
+      }}
     >
       <source src={videoUrl} type={video.mimeType} />
+      {video.mimeType === 'video/mp4' && (
+        <source
+          src={videoUrl}
+          type="video/webm"
+        />
+      )}
+      {video.mimeType === 'video/webm' && (
+        <source
+          src={videoUrl}
+          type="video/mp4"
+        />
+      )}
       Your browser does not support the video tag.
     </video>
   );

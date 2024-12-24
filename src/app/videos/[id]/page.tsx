@@ -48,6 +48,7 @@ export async function generateMetadata(
   const baseUrl = getBaseUrl();
   const videoPageUrl = `${baseUrl}/videos/${video.id}`;
   const videoUrl = getPublicUrl(video.url);
+  const thumbnailUrl = `${baseUrl}/api/videos/${video.id}/thumbnail`;
 
   return {
     title: video.title,
@@ -65,24 +66,29 @@ export async function generateMetadata(
         height: 720,
         secureUrl: videoUrl,
       }],
+      images: [{
+        url: thumbnailUrl,
+        width: 1280,
+        height: 720,
+        alt: video.title,
+      }],
+    },
+    twitter: {
+      card: 'player',
+      title: video.title,
+      description: video.description || undefined,
+      images: [thumbnailUrl],
     },
     other: {
       'theme-color': '#5865F2',
-      'og:type': 'video.other',
+      'og:type': 'video',
       'og:video:type': video.mimeType,
       'og:video:width': '1280',
       'og:video:height': '720',
       'og:video': videoUrl,
       'og:video:secure_url': videoUrl,
-      'og:video:url': videoUrl,
-      'twitter:card': 'player',
-      'twitter:title': video.title,
-      'twitter:description': video.description || '',
-      'twitter:player': videoPageUrl,
-      'twitter:player:width': '1280',
-      'twitter:player:height': '720',
-      'twitter:player:stream': videoUrl,
-      'twitter:player:stream:content_type': video.mimeType,
+      'og:image': thumbnailUrl,
+      'discord:color': '#5865F2',
     },
   };
 }
