@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Video } from '@/lib/videos';
-import { getPublicUrl } from '@/lib/storage';
 
 interface VideoPlayerProps {
   video: Video;
@@ -10,6 +9,22 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoUrl, setVideoUrl] = useState<string>('');
+
+  useEffect(() => {
+    const getVideoUrl = async () => {
+      try {
+        const response = await fetch(`/api/videos/${video.id}/url`);
+        if (!response.ok) throw new Error('Failed to get video URL');
+        const { url } = await response.json();
+        setVideoUrl(url);
+      } catch (error) {
+        console.error('Failed to get video URL:', error);
+      }
+    };
+
+    void getVideoUrl();
+  }, [video.id]);
 
   useEffect(() => {
     const updateViews = async () => {
@@ -37,6 +52,10 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
     }
   }, [video.id]);
 
+  if (!videoUrl) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <video
       ref={videoRef}
@@ -45,7 +64,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
       preload="metadata"
       playsInline
     >
-      <source src={getPublicUrl(video.url)} type={video.mimeType} />
+      <source src={videoUrl} type={video.mimeType} />
       Your browser does not support the video tag.
     </video>
   );
