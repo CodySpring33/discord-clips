@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       id,
       title: validation.title,
       description: validation.description ?? null,
-      url: `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`,
+      url: key,
       mimeType: validation.contentType,
       size: validation.size,
     });

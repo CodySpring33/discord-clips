@@ -3,6 +3,7 @@ import { getVideo } from '@/lib/videos';
 import { VideoPlayer } from '@/components/video-player';
 import { Metadata, ResolvingMetadata } from 'next';
 import { headers } from 'next/headers';
+import { getPublicUrl } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -46,6 +47,7 @@ export async function generateMetadata(
 
   const baseUrl = getBaseUrl();
   const videoPageUrl = `${baseUrl}/videos/${video.id}`;
+  const videoUrl = getPublicUrl(video.url);
 
   return {
     title: video.title,
@@ -55,20 +57,32 @@ export async function generateMetadata(
       description: video.description || undefined,
       type: 'video.other',
       url: videoPageUrl,
+      siteName: 'Discord Clips',
       videos: [{
-        url: video.url,
+        url: videoUrl,
         type: video.mimeType,
         width: 1280,
         height: 720,
+        secureUrl: videoUrl,
       }],
-      images: [
-        {
-          // You might want to generate and store video thumbnails in the future
-          url: '/og-image.png',
-          width: 1280,
-          height: 720,
-        },
-      ],
+    },
+    other: {
+      'theme-color': '#5865F2',
+      'og:type': 'video.other',
+      'og:video:type': video.mimeType,
+      'og:video:width': '1280',
+      'og:video:height': '720',
+      'og:video': videoUrl,
+      'og:video:secure_url': videoUrl,
+      'og:video:url': videoUrl,
+      'twitter:card': 'player',
+      'twitter:title': video.title,
+      'twitter:description': video.description || '',
+      'twitter:player': videoPageUrl,
+      'twitter:player:width': '1280',
+      'twitter:player:height': '720',
+      'twitter:player:stream': videoUrl,
+      'twitter:player:stream:content_type': video.mimeType,
     },
   };
 }
