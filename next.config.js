@@ -12,7 +12,29 @@ const nextConfig = {
       '@': path.join(__dirname, 'src')
     };
     return config;
-  }
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/videos/:id/url',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600', // Cache for 1 hour
+          },
+        ],
+      },
+      {
+        source: '/api/videos/:id/thumbnail',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig; 
