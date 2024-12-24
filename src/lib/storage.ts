@@ -19,6 +19,13 @@ if (isServer) {
       throw new Error(`Missing required environment variable: ${key}`);
     }
   });
+
+  // Log S3 configuration (without sensitive data)
+  console.log('S3 Configuration:', {
+    region: requiredEnvVars.AWS_REGION,
+    bucket: requiredEnvVars.AWS_BUCKET_NAME,
+    maxFileSize: requiredEnvVars.NEXT_PUBLIC_MAX_FILE_SIZE,
+  });
 }
 
 // Initialize S3 client only on the server
@@ -29,6 +36,7 @@ const s3Client = isServer
         accessKeyId: requiredEnvVars.AWS_ACCESS_KEY_ID,
         secretAccessKey: requiredEnvVars.AWS_SECRET_ACCESS_KEY,
       },
+      maxAttempts: 3, // Add retry logic
     })
   : null;
 
@@ -49,6 +57,12 @@ export async function createPresignedUploadUrl({ key, contentType }: PresignedUr
   }
 
   try {
+    console.log('Creating presigned URL for:', {
+      bucket: requiredEnvVars.AWS_BUCKET_NAME,
+      key,
+      contentType,
+    });
+
     const { url, fields } = await createPresignedPost(s3Client!, {
       Bucket: requiredEnvVars.AWS_BUCKET_NAME,
       Key: key,
@@ -58,6 +72,7 @@ export async function createPresignedUploadUrl({ key, contentType }: PresignedUr
       ],
       Fields: {
         'Content-Type': contentType,
+        'x-amz-acl': 'public-read', // Add public-read ACL
       },
       Expires: 600, // 10 minutes
     });
@@ -65,6 +80,9 @@ export async function createPresignedUploadUrl({ key, contentType }: PresignedUr
     return { url, fields };
   } catch (error) {
     console.error('Failed to create presigned URL:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to create upload URL: ${error.message}`);
+    }
     throw new Error('Failed to create upload URL');
   }
 }
@@ -73,5 +91,7 @@ export function getPublicUrl(key: string): string {
   if (!isServer) {
     throw new Error('This function can only be called on the server');
   }
-  return `https://${requiredEnvVars.AWS_BUCKET_NAME}.s3.${requiredEnvVars.AWS_REGION}.amazonaws.com/${key}`;
+
+  // Use path-style URL format which is more reliable
+  return `https://s3.${requiredEnvVars.AWS_REGION}.amazonaws.com/${requiredEnvVars.AWS_BUCKET_NAME}/${key}`;
 } 
