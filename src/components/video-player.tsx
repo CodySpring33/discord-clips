@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { Video } from '@/lib/videos';
+import { getPublicUrl } from '@/lib/storage';
 
 interface VideoPlayerProps {
   video: Video;
@@ -44,7 +45,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
       preload="metadata"
       playsInline
     >
-      <source src={video.url} type={video.mimeType} />
+      <source src={getPublicUrl(video.url)} type={video.mimeType} />
       Your browser does not support the video tag.
     </video>
   );
