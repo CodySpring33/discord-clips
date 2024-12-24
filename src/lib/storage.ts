@@ -1,4 +1,4 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 
 // Only validate environment variables on the server side
@@ -94,4 +94,23 @@ export function getPublicUrl(key: string): string {
 
   // Use path-style URL format which is more reliable
   return `https://s3.${requiredEnvVars.AWS_REGION}.amazonaws.com/${requiredEnvVars.AWS_BUCKET_NAME}/${key}`;
+}
+
+export async function checkVideoExists(key: string): Promise<boolean> {
+  if (!isServer) {
+    throw new Error('This function can only be called on the server');
+  }
+
+  try {
+    const command = new HeadObjectCommand({
+      Bucket: requiredEnvVars.AWS_BUCKET_NAME,
+      Key: key,
+    });
+
+    await s3Client!.send(command);
+    return true;
+  } catch (error) {
+    console.warn('Video not found in S3:', key);
+    return false;
+  }
 } 

@@ -3,18 +3,66 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
+  --primary: #0066FF;
+  --primary-dark: #0052CC;
+  --secondary: #6C2BFF;
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --muted: #666666;
+  --accent: #FF3366;
+  --card: #111111;
+  --card-hover: #222222;
+  --border: #333333;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-rgb: 0, 0, 0;
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
+  }
+  
+  .hero-gradient {
+    background: radial-gradient(circle at center, var(--secondary) 0%, transparent 70%);
+    opacity: 0.15;
+  }
+
+  .card {
+    @apply bg-card rounded-xl border border-border p-6 transition-all duration-200 hover:border-primary/50;
+  }
+
+  .button-primary {
+    @apply bg-primary hover:bg-primary-dark text-white font-medium py-2 px-6 rounded-full transition-all duration-200;
+  }
+
+  .button-secondary {
+    @apply bg-card hover:bg-card-hover text-white font-medium py-2 px-6 rounded-full border border-border transition-all duration-200;
+  }
+
+  .nav-link {
+    @apply text-muted hover:text-white transition-colors duration-200;
+  }
+}
+
+/* Modern scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }

@@ -44,6 +44,8 @@ export function UploadForm(): JSX.Element {
         size: file.size,
       });
       setFile(file);
+      // Auto-fill title from filename without extension
+      setTitle(file.name.replace(/\.[^/.]+$/, ''));
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -143,50 +145,104 @@ export function UploadForm(): JSX.Element {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          isDragActive ? 'border-primary bg-primary/10' : 'border-border'
+        className={`border-2 border-dashed rounded-xl p-8 transition-all duration-200 ${
+          isDragActive 
+            ? 'border-primary bg-primary/5' 
+            : file 
+              ? 'border-primary/50 bg-primary/5' 
+              : 'border-border hover:border-primary/30 hover:bg-card-hover'
         }`}
       >
         <input {...getInputProps()} />
-        {file ? (
-          <div className="text-sm">
-            <p className="font-medium">{file.name}</p>
-            <p className="text-muted-foreground">
-              {(file.size / 1024 / 1024).toFixed(2)} MB
-            </p>
-          </div>
-        ) : isDragActive ? (
-          <p>Drop the video here</p>
-        ) : (
-          <div className="text-sm text-muted-foreground">
-            <p>Drag and drop a video here, or click to select</p>
-            <p>MP4 or WebM, max 100MB</p>
-          </div>
-        )}
+        <div className="text-center">
+          {file ? (
+            <div className="space-y-2">
+              <div className="h-12 w-12 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
+                <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="font-medium">{file.name}</p>
+              <p className="text-sm text-muted">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+          ) : isDragActive ? (
+            <div className="space-y-2">
+              <div className="h-12 w-12 rounded-full bg-primary/10 mx-auto flex items-center justify-center animate-pulse">
+                <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </div>
+              <p className="font-medium">Drop your video here</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="h-12 w-12 rounded-full bg-border/50 mx-auto flex items-center justify-center">
+                <svg className="h-6 w-6 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </div>
+              <p className="font-medium">Drag and drop your video here</p>
+              <p className="text-sm text-muted">MP4 or WebM, max 100MB</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <Input
-        type="text"
-        placeholder="Title"
-        value={title}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-        required
-        maxLength={100}
-      />
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-muted mb-1">
+            Title
+          </label>
+          <Input
+            id="title"
+            type="text"
+            placeholder="Enter a title for your clip"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            maxLength={100}
+          />
+        </div>
 
-      <Textarea
-        placeholder="Description (optional)"
-        value={description}
-        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-        maxLength={500}
-      />
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-muted mb-1">
+            Description (optional)
+          </label>
+          <Textarea
+            id="description"
+            placeholder="Add a description to your clip"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
+            rows={4}
+          />
+        </div>
+      </div>
 
-      <Button type="submit" disabled={!file || !title || isUploading}>
-        {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload'}
-      </Button>
+      <div>
+        <Button 
+          type="submit" 
+          disabled={!file || !title || isUploading}
+          className="w-full relative"
+        >
+          <span className={isUploading ? 'opacity-0' : 'opacity-100'}>
+            Upload Video
+          </span>
+          {isUploading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>{uploadProgress}%</span>
+              </div>
+            </div>
+          )}
+        </Button>
+      </div>
     </form>
   );
 } 

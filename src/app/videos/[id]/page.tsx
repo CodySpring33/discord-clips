@@ -4,6 +4,8 @@ import { VideoPlayer } from '@/components/video-player';
 import { Metadata, ResolvingMetadata } from 'next';
 import { headers } from 'next/headers';
 import { getPublicUrl } from '@/lib/storage';
+import { Navbar } from '@/components/navbar';
+import { formatDistanceToNow } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,12 +17,10 @@ interface Props {
 }
 
 function getBaseUrl(): string {
-  // Check for Vercel environment variables first
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
 
-  // For preview deployments
   if (process.env.VERCEL_ENV === 'preview') {
     const headersList = headers();
     const host = headersList.get('host');
@@ -29,7 +29,6 @@ function getBaseUrl(): string {
     }
   }
 
-  // Fallback for local development
   return 'http://localhost:3000';
 }
 
@@ -101,17 +100,85 @@ export default async function VideoPage({ params }: Props): Promise<JSX.Element>
   }
 
   return (
-    <main className="min-h-screen py-12">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-4">{video.title}</h1>
-        <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
-          <VideoPlayer video={video} />
+    <>
+      <Navbar />
+      <main className="min-h-screen pt-24 pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Video Player Column */}
+            <div className="lg:col-span-2">
+              <div className="bg-card rounded-xl overflow-hidden">
+                <div className="aspect-video">
+                  <VideoPlayer video={video} />
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
+                <div className="flex items-center text-sm text-muted mb-4">
+                  <span>{video.views.toLocaleString()} views</span>
+                  <span className="mx-2">•</span>
+                  <span>{formatDistanceToNow(new Date(video.createdAt), { addSuffix: true })}</span>
+                </div>
+                {video.description && (
+                  <p className="text-muted whitespace-pre-wrap">{video.description}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Info Column */}
+            <div className="lg:col-span-1">
+              <div className="card">
+                <h2 className="text-lg font-semibold mb-4">Share</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-muted mb-1">
+                      Video URL
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${getBaseUrl()}/videos/${video.id}`}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted mb-1">
+                      Direct Link
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={getPublicUrl(video.url)}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card mt-6">
+                <h2 className="text-lg font-semibold mb-4">Video Info</h2>
+                <dl className="space-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-muted">Format</dt>
+                    <dd className="mt-1">{video.mimeType.split('/')[1].toUpperCase()}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-muted">Size</dt>
+                    <dd className="mt-1">{(video.size / 1024 / 1024).toFixed(1)} MB</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-muted">Uploaded</dt>
+                    <dd className="mt-1">{new Date(video.createdAt).toLocaleDateString()}</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="text-gray-600">{video.description}</p>
-        <div className="mt-4 text-sm text-gray-500">
-          {video.views.toLocaleString()} views
-        </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 } 
