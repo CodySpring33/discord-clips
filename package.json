@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.490.0",
     "@aws-sdk/s3-presigned-post": "^3.490.0",
+    "@vercel/analytics": "^1.4.1",
     "@vercel/kv": "^1.0.1",
     "clsx": "^2.1.1",
     "nanoid": "^5.0.4",
