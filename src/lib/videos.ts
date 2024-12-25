@@ -62,14 +62,17 @@ export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Pr
 
 export async function incrementViews(id: string): Promise<void> {
   try {
-    await kv.incr(`video:${id}:views`);
-    
-    // Update the views in the main video object
+    // Get the current video first
     const video = await getVideo(id);
-    if (video) {
-      video.views = (await kv.get<number>(`video:${id}:views`)) ?? 0;
-      await kv.set(`video:${id}`, video);
+    if (!video) {
+      throw new Error('Video not found');
     }
+
+    // Increment the views directly on the video object
+    video.views += 1;
+
+    // Update the video in KV store
+    await kv.set(`video:${id}`, video);
   } catch (error) {
     console.error('Failed to increment views:', error);
     throw error;

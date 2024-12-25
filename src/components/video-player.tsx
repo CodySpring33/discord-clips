@@ -13,6 +13,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
+  const [hasViewBeenCounted, setHasViewBeenCounted] = useState(false);
 
   useEffect(() => {
     const getVideoUrl = async () => {
@@ -47,8 +48,14 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
 
   useEffect(() => {
     const updateViews = async () => {
+      if (hasViewBeenCounted) return;
+      
       try {
         await fetch(`/api/videos/${video.id}/view`, { method: 'POST' });
+        setHasViewBeenCounted(true);
+        
+        // Store in sessionStorage to prevent counting views across page refreshes
+        sessionStorage.setItem(`video-${video.id}-viewed`, 'true');
       } catch (error: unknown) {
         console.error('Failed to update views:', error);
       }
@@ -67,6 +74,10 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
 
     const videoElement = videoRef.current;
     if (videoElement) {
+      // Check if this video has already been viewed in this session
+      const hasBeenViewed = sessionStorage.getItem(`video-${video.id}-viewed`) === 'true';
+      setHasViewBeenCounted(hasBeenViewed);
+
       videoElement.addEventListener('play', handlePlay);
       videoElement.addEventListener('error', handleError);
       return () => {
@@ -74,7 +85,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
         videoElement.removeEventListener('error', handleError);
       };
     }
-  }, [video.id]);
+  }, [video.id, hasViewBeenCounted]);
 
   if (error) {
     return (
