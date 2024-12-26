@@ -15,6 +15,40 @@ export interface Video {
   author?: string;
 }
 
+async function migrateHashToJson(id: string): Promise<Video | null> {
+  try {
+    // Try to get the video in hash format
+    const videoHash = await kv.hgetall(`video:${id}`);
+    if (!videoHash || !videoHash.title) {
+      return null;
+    }
+
+    // Convert hash to Video object
+    const video: Video = {
+      id: String(id),
+      title: String(videoHash.title),
+      description: videoHash.description ? String(videoHash.description) : null,
+      url: String(videoHash.url),
+      mimeType: String(videoHash.mimeType),
+      size: Number(videoHash.size),
+      views: Number(videoHash.views || 0),
+      createdAt: String(videoHash.createdAt),
+      thumbnailUrl: videoHash.thumbnailUrl ? String(videoHash.thumbnailUrl) : undefined,
+      duration: videoHash.duration ? String(videoHash.duration) : undefined,
+      author: videoHash.author ? String(videoHash.author) : undefined,
+    };
+
+    // Store in new format
+    await kv.del(`video:${id}`); // Delete hash
+    await kv.set(`video:${id}`, video); // Store as JSON
+    console.log(`Migrated video ${id} from hash to JSON format`);
+    return video;
+  } catch (error) {
+    console.error(`Failed to migrate video ${id}:`, error);
+    return null;
+  }
+}
+
 export async function getAllVideos(): Promise<Video[]> {
   try {
     // Get all video IDs
@@ -26,18 +60,28 @@ export async function getAllVideos(): Promise<Video[]> {
 
     // Get all videos in parallel
     const videos = await Promise.all(
-      videoIds.map(async (id) => kv.get<Video>(`video:${id}`))
+      videoIds.map(async (id) => {
+        try {
+          // Try to get video in JSON format
+          let video = await kv.get<Video>(`video:${id}`);
+          
+          // If not found, try to migrate from hash format
+          if (!video) {
+            video = await migrateHashToJson(id);
+          }
+          
+          return video;
+        } catch (err) {
+          console.error(`Failed to get video ${id}:`, err);
+          return null;
+        }
+      })
     );
 
     // Filter out any null values and sort by date
     return videos
-      .filter((video: Video | null): video is Video => {
-        if (!video || !video.title) {
-          return false;
-        }
-        return true;
-      })
-      .sort((a: Video, b: Video) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .filter((video): video is Video => video !== null)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Failed to get videos:', error);
     return [];
@@ -46,7 +90,15 @@ export async function getAllVideos(): Promise<Video[]> {
 
 export async function getVideo(id: string): Promise<Video | null> {
   try {
-    return await kv.get<Video>(`video:${id}`);
+    // Try to get video in JSON format
+    let video = await kv.get<Video>(`video:${id}`);
+    
+    // If not found, try to migrate from hash format
+    if (!video) {
+      video = await migrateHashToJson(id);
+    }
+    
+    return video;
   } catch (error) {
     console.error('Failed to get video:', error);
     return null;
@@ -63,6 +115,7 @@ export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Pr
   try {
     // Store the video
     await kv.set(`video:${video.id}`, newVideo);
+    
     // Add the ID to the set of all video IDs
     await kv.sadd('video_ids', video.id);
     return newVideo;
@@ -74,19 +127,25 @@ export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Pr
 
 export async function incrementViews(id: string): Promise<void> {
   try {
-    // Get the current video first
-    const video = await getVideo(id);
+    console.log(`Incrementing views for video ${id}`);
+    
+    // Get current video
+    const video = await kv.get<Video>(`video:${id}`);
     if (!video) {
+      console.error(`Video ${id} not found when trying to increment views`);
       throw new Error('Video not found');
     }
 
-    // Increment the views directly on the video object
-    video.views += 1;
+    // Increment views and update
+    const updatedVideo = {
+      ...video,
+      views: video.views + 1
+    };
 
-    // Update the video in KV store
-    await kv.set(`video:${id}`, video);
+    await kv.set(`video:${id}`, updatedVideo);
+    console.log(`Successfully incremented views for video ${id}. New view count:`, updatedVideo.views);
   } catch (error) {
-    console.error('Failed to increment views:', error);
+    console.error(`Failed to increment views for video ${id}:`, error);
     throw error;
   }
 }

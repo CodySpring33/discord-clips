@@ -18,6 +18,75 @@ export function VideoPlayer({ video }: VideoPlayerProps): React.ReactElement {
   const [hasViewBeenCounted, setHasViewBeenCounted] = useState(false);
   const watchTimeRef = useRef(0);
   const lastUpdateRef = useRef(Date.now());
+  const isCountingRef = useRef(false);
+  const viewUpdatePromiseRef = useRef<Promise<void> | null>(null);
+
+  const updateViews = async () => {
+    if (hasViewBeenCounted || isCountingRef.current) return;
+    
+    // If there's already an update in progress, wait for it
+    if (viewUpdatePromiseRef.current) {
+      await viewUpdatePromiseRef.current;
+      return;
+    }
+
+    isCountingRef.current = true;
+    
+    const updatePromise = (async () => {
+      try {
+        console.log('Attempting to update view count for video:', video.id);
+        const response = await fetch(`/api/videos/${video.id}/view`, { 
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('View update failed with status:', response.status);
+          throw new Error(`Failed to update view count: ${response.status}`);
+        }
+        
+        setHasViewBeenCounted(true);
+        setLocalViews(prev => prev + 1);
+        console.log('Successfully updated view count for video:', video.id);
+        
+        // Store view timestamp in localStorage to prevent counting views too frequently
+        localStorage.setItem(`video-${video.id}-last-view`, Date.now().toString());
+      } catch (error: unknown) {
+        console.error('Failed to update views:', error);
+      } finally {
+        isCountingRef.current = false;
+        viewUpdatePromiseRef.current = null;
+      }
+    })();
+
+    viewUpdatePromiseRef.current = updatePromise;
+    await updatePromise;
+  };
+
+  // Reset counting state when component unmounts or video changes
+  useEffect(() => {
+    return () => {
+      isCountingRef.current = false;
+      viewUpdatePromiseRef.current = null;
+      watchTimeRef.current = 0;
+    };
+  }, [video.id]);
+
+  // Check for recent views on mount
+  useEffect(() => {
+    const lastViewStr = localStorage.getItem(`video-${video.id}-last-view`);
+    if (lastViewStr) {
+      const lastView = parseInt(lastViewStr, 10);
+      const minutesSinceLastView = (Date.now() - lastView) / (1000 * 60);
+      if (minutesSinceLastView < 5) {
+        setHasViewBeenCounted(true);
+        isCountingRef.current = false;
+        viewUpdatePromiseRef.current = null;
+      }
+    }
+  }, [video.id]);
 
   useEffect(() => {
     const getVideoUrl = async () => {
@@ -49,90 +118,6 @@ export function VideoPlayer({ video }: VideoPlayerProps): React.ReactElement {
 
     void getVideoUrl();
   }, [video.id]);
-
-  useEffect(() => {
-    const updateViews = async () => {
-      if (hasViewBeenCounted) return;
-      
-      try {
-        const response = await fetch(`/api/videos/${video.id}/view`, { 
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to update view count');
-        }
-        
-        setHasViewBeenCounted(true);
-        setLocalViews(prev => prev + 1);
-        
-        // Store view timestamp in localStorage to prevent counting views too frequently
-        localStorage.setItem(`video-${video.id}-last-view`, Date.now().toString());
-      } catch (error: unknown) {
-        console.error('Failed to update views:', error);
-      }
-    };
-
-    const handleTimeUpdate = () => {
-      const videoElement = videoRef.current;
-      if (!videoElement || hasViewBeenCounted) return;
-
-      // Check if this video has been viewed recently (within 1 hour)
-      const lastViewStr = localStorage.getItem(`video-${video.id}-last-view`);
-      if (lastViewStr) {
-        const lastView = parseInt(lastViewStr, 10);
-        const hoursSinceLastView = (Date.now() - lastView) / (1000 * 60 * 60);
-        if (hoursSinceLastView < 1) {
-          setHasViewBeenCounted(true);
-          return;
-        }
-      }
-
-      // Update watch time
-      const now = Date.now();
-      const timeDiff = now - lastUpdateRef.current;
-      lastUpdateRef.current = now;
-      
-      if (videoElement.paused) return;
-      
-      watchTimeRef.current += timeDiff;
-
-      // Count view after 5 seconds of watching
-      if (watchTimeRef.current >= 5000) {
-        void updateViews();
-      }
-    };
-
-    const handleEnded = () => {
-      // Count view if video is watched to the end, even if less than 5 seconds
-      if (!hasViewBeenCounted) {
-        void updateViews();
-      }
-    };
-
-    const handleError = (e: Event) => {
-      const videoElement = e.target as HTMLVideoElement;
-      if (videoElement.error) {
-        setError(`Failed to play video: ${videoElement.error.message}`);
-      }
-    };
-
-    const videoElement = videoRef.current;
-    if (videoElement) {
-      videoElement.addEventListener('timeupdate', handleTimeUpdate);
-      videoElement.addEventListener('ended', handleEnded);
-      videoElement.addEventListener('error', handleError);
-
-      return () => {
-        videoElement.removeEventListener('timeupdate', handleTimeUpdate);
-        videoElement.removeEventListener('ended', handleEnded);
-        videoElement.removeEventListener('error', handleError);
-      };
-    }
-  }, [video.id, hasViewBeenCounted]);
 
   if (error) {
     return (
@@ -171,9 +156,33 @@ export function VideoPlayer({ video }: VideoPlayerProps): React.ReactElement {
           preload="metadata"
           playsInline
           poster={thumbnailUrl}
+          onTimeUpdate={() => {
+            const videoElement = videoRef.current;
+            if (!videoElement || hasViewBeenCounted) return;
+
+            // Update watch time
+            const now = Date.now();
+            const timeDiff = now - lastUpdateRef.current;
+            lastUpdateRef.current = now;
+            
+            if (videoElement.paused) return;
+            
+            watchTimeRef.current += timeDiff;
+
+            // Count view after 2 seconds of watching
+            if (watchTimeRef.current >= 2000 && !viewUpdatePromiseRef.current) {
+              void updateViews();
+            }
+          }}
+          onEnded={() => {
+            if (!hasViewBeenCounted && !viewUpdatePromiseRef.current) {
+              void updateViews();
+            }
+          }}
           onError={(e) => {
             const target = e.currentTarget;
             if (target.error) {
+              console.error('Video error:', target.error.message);
               setError(`Failed to play video: ${target.error.message}`);
             }
           }}

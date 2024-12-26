@@ -38,13 +38,19 @@ export async function POST(request: Request) {
     const key = `videos/${id}${validation.contentType === 'video/mp4' ? '.mp4' : '.webm'}`;
     const { url, fields } = await createPresignedUploadUrl({ key, contentType: validation.contentType });
 
-    await createVideo({
+    const video = await createVideo({
       id,
       title: validation.title,
       description: validation.description ?? null,
       url: key,
       mimeType: validation.contentType,
       size: validation.size,
+    });
+
+    console.log('Successfully created video record:', {
+      id: video.id,
+      title: video.title,
+      size: video.size,
     });
 
     return NextResponse.json({ url, fields, id });

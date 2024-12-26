@@ -42,8 +42,11 @@ Returns details for a specific video.
 {
   "id": "string",
   "title": "string",
-  "thumbnailUrl": "string",
-  "videoUrl": "string",
+  "description": "string",
+  "url": "string",
+  "mimeType": "string",
+  "size": int,
+  "views": int,
   "createdAt": "string"
 }
 ```
