@@ -27,7 +27,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/videos" className="hover:text-[#5865F2] transition-colors">
+                <Link href="/browse" className="hover:text-[#5865F2] transition-colors">
                   Browse Videos
                 </Link>
               </li>
