@@ -12,7 +12,12 @@ export async function POST(
     console.error('Failed to increment views:', error);
     return new NextResponse(
       JSON.stringify({ message: 'Failed to update view count' }),
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     );
   }
 } 

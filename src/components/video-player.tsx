@@ -13,6 +13,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
+  const [localViews, setLocalViews] = useState(video.views);
   const [hasViewBeenCounted, setHasViewBeenCounted] = useState(false);
 
   useEffect(() => {
@@ -51,8 +52,19 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
       if (hasViewBeenCounted) return;
       
       try {
-        await fetch(`/api/videos/${video.id}/view`, { method: 'POST' });
+        const response = await fetch(`/api/videos/${video.id}/view`, { 
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to update view count');
+        }
+        
         setHasViewBeenCounted(true);
+        setLocalViews(prev => prev + 1);
         
         // Store in sessionStorage to prevent counting views across page refreshes
         sessionStorage.setItem(`video-${video.id}-viewed`, 'true');
@@ -76,7 +88,11 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
     if (videoElement) {
       // Check if this video has already been viewed in this session
       const hasBeenViewed = sessionStorage.getItem(`video-${video.id}-viewed`) === 'true';
-      setHasViewBeenCounted(hasBeenViewed);
+      if (hasBeenViewed) {
+        setHasViewBeenCounted(true);
+        // Update local views if already viewed
+        setLocalViews(video.views);
+      }
 
       videoElement.addEventListener('play', handlePlay);
       videoElement.addEventListener('error', handleError);
@@ -85,7 +101,7 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
         videoElement.removeEventListener('error', handleError);
       };
     }
-  }, [video.id, hasViewBeenCounted]);
+  }, [video.id, hasViewBeenCounted, video.views]);
 
   if (error) {
     return (
@@ -104,34 +120,39 @@ export function VideoPlayer({ video }: VideoPlayerProps): JSX.Element {
   }
 
   return (
-    <video
-      ref={videoRef}
-      className="w-full h-full"
-      controls
-      preload="metadata"
-      playsInline
-      poster={thumbnailUrl}
-      onError={(e) => {
-        const target = e.currentTarget;
-        if (target.error) {
-          setError(`Failed to play video: ${target.error.message}`);
-        }
-      }}
-    >
-      <source src={videoUrl} type={video.mimeType} />
-      {video.mimeType === 'video/mp4' && (
-        <source
-          src={videoUrl}
-          type="video/webm"
-        />
-      )}
-      {video.mimeType === 'video/webm' && (
-        <source
-          src={videoUrl}
-          type="video/mp4"
-        />
-      )}
-      Your browser does not support the video tag.
-    </video>
+    <div>
+      <video
+        ref={videoRef}
+        className="w-full h-full"
+        controls
+        preload="metadata"
+        playsInline
+        poster={thumbnailUrl}
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (target.error) {
+            setError(`Failed to play video: ${target.error.message}`);
+          }
+        }}
+      >
+        <source src={videoUrl} type={video.mimeType} />
+        {video.mimeType === 'video/mp4' && (
+          <source
+            src={videoUrl}
+            type="video/webm"
+          />
+        )}
+        {video.mimeType === 'video/webm' && (
+          <source
+            src={videoUrl}
+            type="video/mp4"
+          />
+        )}
+        Your browser does not support the video tag.
+      </video>
+      <div className="mt-4 text-sm text-gray-500">
+        {localViews.toLocaleString()} views
+      </div>
+    </div>
   );
 } 
