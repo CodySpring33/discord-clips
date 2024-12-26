@@ -7,7 +7,7 @@ const UPLOAD_WINDOW = 24 * 60 * 60; // 24 hours in seconds
 async function cleanupOldKeys(ip: string): Promise<void> {
   try {
     await kv.del(`ratelimit:${ip}`);
-  } catch (error) {
+  } catch {
     // Ignore cleanup errors
   }
 }

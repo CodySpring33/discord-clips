@@ -1,4 +1,5 @@
 import { kv } from '@vercel/kv';
+import { deleteObject } from '@/lib/storage';
 
 export interface Video {
   id: string;
@@ -9,22 +10,33 @@ export interface Video {
   size: number;
   views: number;
   createdAt: string;
+  thumbnailUrl?: string;
+  duration?: string;
+  author?: string;
 }
 
 export async function getAllVideos(): Promise<Video[]> {
   try {
     // Get all video IDs
     const videoIds = await kv.smembers('video_ids');
-    if (!Array.isArray(videoIds) || !videoIds.length) return [];
+    
+    if (!Array.isArray(videoIds) || !videoIds.length) {
+      return [];
+    }
 
     // Get all videos in parallel
     const videos = await Promise.all(
-      videoIds.map((id) => kv.get<Video>(`video:${id}`))
+      videoIds.map(async (id) => kv.get<Video>(`video:${id}`))
     );
 
     // Filter out any null values and sort by date
     return videos
-      .filter((video: Video | null): video is Video => video !== null)
+      .filter((video: Video | null): video is Video => {
+        if (!video || !video.title) {
+          return false;
+        }
+        return true;
+      })
       .sort((a: Video, b: Video) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Failed to get videos:', error);
@@ -75,6 +87,26 @@ export async function incrementViews(id: string): Promise<void> {
     await kv.set(`video:${id}`, video);
   } catch (error) {
     console.error('Failed to increment views:', error);
+    throw error;
+  }
+}
+
+export async function deleteVideo(id: string): Promise<void> {
+  try {
+    // Get the video first to get its URL
+    const video = await getVideo(id);
+    if (!video) {
+      throw new Error('Video not found');
+    }
+
+    // Delete from S3
+    await deleteObject(video.url);
+
+    // Delete from KV
+    await kv.del(`video:${id}`);
+    await kv.srem('video_ids', id);
+  } catch (error) {
+    console.error('Failed to delete video:', error);
     throw error;
   }
 } 

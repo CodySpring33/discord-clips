@@ -1,0 +1,16 @@
+{
+  "name": "Discord Clips",
+  "short_name": "Discord Clips",
+  "description": "Share your gaming moments with your Discord community",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#5865F2",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16",
+      "type": "image/x-icon"
+    }
+  ]
+} 

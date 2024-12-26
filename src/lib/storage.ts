@@ -1,4 +1,4 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 
 // Only validate environment variables on the server side
@@ -94,4 +94,26 @@ export function getPublicUrl(key: string): string {
 
   // Use path-style URL format which is more reliable
   return `https://s3.${requiredEnvVars.AWS_REGION}.amazonaws.com/${requiredEnvVars.AWS_BUCKET_NAME}/${key}`;
+}
+
+export async function deleteObject(key: string): Promise<void> {
+  const s3Client = new S3Client({
+    region: requiredEnvVars.AWS_REGION,
+    credentials: {
+      accessKeyId: requiredEnvVars.AWS_ACCESS_KEY_ID,
+      secretAccessKey: requiredEnvVars.AWS_SECRET_ACCESS_KEY,
+    },
+  });
+
+  try {
+    await s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: requiredEnvVars.AWS_BUCKET_NAME,
+        Key: key,
+      })
+    );
+  } catch (error) {
+    console.error('Failed to delete object from S3:', error);
+    throw error;
+  }
 } 

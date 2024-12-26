@@ -20,7 +20,8 @@ const uploadRequestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const ip = headers().get('x-forwarded-for') || 'unknown';
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for') || 'unknown';
     
     const isAllowed = await checkRateLimit(ip);
     if (!isAllowed) {

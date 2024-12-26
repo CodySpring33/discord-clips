@@ -6,7 +6,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    await incrementViews(params.id);
+    const id = String(await params.id);
+    await incrementViews(id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('Failed to increment views:', error);

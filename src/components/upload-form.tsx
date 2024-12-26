@@ -2,140 +2,112 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { z } from 'zod';
-import { Button, Input, Textarea } from '@/components/ui';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 
-const MAX_FILE_SIZE = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 104857600; // 100MB
-
-const uploadRequestSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
-  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
-  contentType: z.enum(['video/mp4', 'video/webm'], {
-    errorMap: () => ({ message: 'Only MP4 and WebM files are supported' }),
-  }),
-  size: z.number().max(MAX_FILE_SIZE, 'File size must be less than 100MB'),
-});
-
-interface UploadResponse {
-  url: string;
-  fields: Record<string, string>;
-  id: string;
-  message?: string;
-}
-
-export function UploadForm(): JSX.Element {
+export function UploadForm(): React.ReactElement {
   const router = useRouter();
-  const [isUploading, setIsUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const maxSize = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 100 * 1024 * 1024;
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
-    if (!file) return;
-
-    try {
-      uploadRequestSchema.parse({
-        title: 'Validation', // Dummy title for file validation
-        contentType: file.type,
-        size: file.size,
-      });
-      setFile(file);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      }
+    if (file.size > maxSize) {
+      toast.error(`File size must be less than ${(maxSize / 1024 / 1024).toFixed(0)}MB`);
+      return;
     }
+    if (!file.type.startsWith('video/')) {
+      toast.error('File must be a video');
+      return;
+    }
+    setFile(file);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'video/mp4': ['.mp4'],
-      'video/webm': ['.webm'],
+      'video/*': ['.mp4', '.webm'],
     },
     maxFiles: 1,
-    maxSize: MAX_FILE_SIZE,
   });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || isUploading) return;
+    if (!file) return;
 
     try {
       setIsUploading(true);
       setUploadProgress(0);
 
-      const validation = uploadRequestSchema.parse({
-        title,
-        description,
-        contentType: file.type,
-        size: file.size,
-      });
-
-      const response = await fetch('/api/videos/upload', {
+      // Get upload URL
+      const uploadResponse = await fetch('/api/videos/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(validation),
+        body: JSON.stringify({
+          title,
+          description,
+          contentType: file.type,
+          size: file.size,
+        }),
       });
 
-      const data = (await response.json()) as UploadResponse;
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to get upload URL');
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to get upload URL');
       }
 
-      const { url, fields, id } = data;
+      const { url, fields, id } = await uploadResponse.json();
 
+      // Create form data for S3 upload
       const formData = new FormData();
       Object.entries(fields).forEach(([key, value]) => {
-        formData.append(key, value);
+        formData.append(key, value as string);
       });
       formData.append('file', file);
 
-      // Use XMLHttpRequest for upload progress
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(progress);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        };
-
-        xhr.onerror = () => {
-          reject(new Error('Upload failed'));
-        };
-
-        xhr.open('POST', url);
-        xhr.send(formData);
+      // Upload to S3
+      const uploadResult = await fetch(url, {
+        method: 'POST',
+        body: formData,
       });
+
+      if (!uploadResult.ok) {
+        throw new Error('Failed to upload to storage');
+      }
+
+      // Create video record
+      const createResponse = await fetch('/api/videos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          title,
+          description: description || null,
+          mimeType: file.type,
+          size: file.size,
+          url: `videos/${id}${file.type === 'video/mp4' ? '.mp4' : '.webm'}`,
+        }),
+      });
+
+      if (!createResponse.ok) {
+        throw new Error('Failed to create video record');
+      }
 
       toast.success('Video uploaded successfully!');
       router.push(`/videos/${id}`);
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Upload error:', error);
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error('Failed to upload video');
-      }
+      toast.error('Failed to upload video');
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -143,49 +115,104 @@ export function UploadForm(): JSX.Element {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          isDragActive ? 'border-primary bg-primary/10' : 'border-border'
+        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragActive
+            ? 'border-primary bg-primary/5'
+            : 'border-border hover:border-primary/50 hover:bg-accent/5'
         }`}
       >
         <input {...getInputProps()} />
-        {file ? (
-          <div className="text-sm">
-            <p className="font-medium">{file.name}</p>
-            <p className="text-muted-foreground">
-              {(file.size / 1024 / 1024).toFixed(2)} MB
-            </p>
-          </div>
-        ) : isDragActive ? (
-          <p>Drop the video here</p>
-        ) : (
-          <div className="text-sm text-muted-foreground">
-            <p>Drag and drop a video here, or click to select</p>
-            <p>MP4 or WebM, max 100MB</p>
-          </div>
-        )}
+        <div className="space-y-2">
+          {file ? (
+            <>
+              <div className="text-2xl">📹</div>
+              <div>
+                <p className="font-medium">{file.name}</p>
+                <p className="text-sm text-muted">
+                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl">📤</div>
+              <div className="text-sm">
+                <p className="font-medium">
+                  {isDragActive ? 'Drop your video here' : 'Drag and drop your video'}
+                </p>
+                <p className="text-muted">MP4 or WebM, max {(maxSize / 1024 / 1024).toFixed(0)}MB</p>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      <Input
-        type="text"
-        placeholder="Title"
-        value={title}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-        required
-        maxLength={100}
-      />
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <label htmlFor="title" className="text-sm font-medium">
+            Title
+          </label>
+          <Input
+            id="title"
+            type="text"
+            placeholder="Give your clip a title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            maxLength={100}
+          />
+        </div>
 
-      <Textarea
-        placeholder="Description (optional)"
-        value={description}
-        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-        maxLength={500}
-      />
+        <div className="space-y-2">
+          <label htmlFor="description" className="text-sm font-medium">
+            Description (optional)
+          </label>
+          <Textarea
+            id="description"
+            placeholder="Add a description to your clip"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
+            rows={4}
+          />
+        </div>
+      </div>
 
-      <Button type="submit" disabled={!file || !title || isUploading}>
-        {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload'}
+      <Button
+        type="submit"
+        disabled={!file || !title || isUploading}
+        className="w-full"
+      >
+        {isUploading ? (
+          <div className="flex items-center space-x-2">
+            <svg
+              className="animate-spin h-4 w-4"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>Uploading {uploadProgress}%</span>
+          </div>
+        ) : (
+          'Upload Clip'
+        )}
       </Button>
     </form>
   );

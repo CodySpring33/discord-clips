@@ -7,7 +7,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
-    const video = await getVideo(params.id);
+    const id = String(params.id);
+    const video = await getVideo(id);
     if (!video) {
       return new NextResponse(
         JSON.stringify({ message: 'Video not found' }),

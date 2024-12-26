@@ -3,14 +3,19 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['nanoid']
+  transpilePackages: ['nanoid'],
+  images: {
+    domains: ['discord-clips-storage.s3.us-west-2.amazonaws.com'],
   },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.join(__dirname, 'src')
     };
+    config.externals.push({
+      'utf-8-validate': 'commonjs utf-8-validate',
+      'bufferutil': 'commonjs bufferutil',
+    })
     return config;
   },
   async headers() {

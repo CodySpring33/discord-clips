@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation';
 import { getVideo } from '@/lib/videos';
 import { VideoPlayer } from '@/components/video-player';
-import { Metadata, ResolvingMetadata } from 'next';
+import { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { getPublicUrl } from '@/lib/storage';
+import { ReactElement } from 'react';
+import { DeleteVideoButton } from '@/components/delete-video-button';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,7 +16,7 @@ interface Props {
   };
 }
 
-function getBaseUrl(): string {
+async function getBaseUrl(): Promise<string> {
   // Check for Vercel environment variables first
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
@@ -22,7 +24,7 @@ function getBaseUrl(): string {
 
   // For preview deployments
   if (process.env.VERCEL_ENV === 'preview') {
-    const headersList = headers();
+    const headersList = await headers();
     const host = headersList.get('host');
     if (host) {
       return `https://${host}`;
@@ -34,18 +36,17 @@ function getBaseUrl(): string {
 }
 
 export async function generateMetadata(
-  { params }: Props,
-  parent: ResolvingMetadata
+  { params }: Props
 ): Promise<Metadata> {
-  const video = await getVideo(params.id);
+  const video = await getVideo(String(params.id));
 
   if (!video) {
     return {
-      title: 'Video Not Found',
+      title: 'Not Found',
     };
   }
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = await getBaseUrl();
   const videoPageUrl = `${baseUrl}/videos/${video.id}`;
   const videoUrl = getPublicUrl(video.url);
   const thumbnailUrl = `${baseUrl}/api/videos/${video.id}/thumbnail`;
@@ -93,7 +94,7 @@ export async function generateMetadata(
   };
 }
 
-export default async function VideoPage({ params }: Props): Promise<JSX.Element> {
+export default async function VideoPage({ params }: Props): Promise<ReactElement> {
   const video = await getVideo(params.id);
 
   if (!video) {
@@ -103,12 +104,15 @@ export default async function VideoPage({ params }: Props): Promise<JSX.Element>
   return (
     <main className="min-h-screen py-12">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-4">{video.title}</h1>
+        <div className="flex justify-between items-start mb-4">
+          <h1 className="text-3xl font-bold">{video.title}</h1>
+          <DeleteVideoButton videoId={video.id} />
+        </div>
         <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
           <VideoPlayer video={video} />
         </div>
-        <p className="text-gray-600">{video.description}</p>
-        <div className="mt-4 text-sm text-gray-500">
+        <p className="text-gray-600 dark:text-gray-300">{video.description}</p>
+        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
           {video.views.toLocaleString()} views
         </div>
       </div>
