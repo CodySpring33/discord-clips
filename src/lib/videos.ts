@@ -49,13 +49,13 @@ async function migrateHashToJson(id: string): Promise<Video | null> {
   }
 }
 
-export async function getAllVideos(): Promise<Video[]> {
+export async function getAllVideos(limit?: number, page: number = 1): Promise<{ videos: Video[]; total: number }> {
   try {
     // Get all video IDs
     const videoIds = await kv.smembers('video_ids');
     
     if (!Array.isArray(videoIds) || !videoIds.length) {
-      return [];
+      return { videos: [], total: 0 };
     }
 
     // Get all videos in parallel
@@ -79,12 +79,28 @@ export async function getAllVideos(): Promise<Video[]> {
     );
 
     // Filter out any null values and sort by date
-    return videos
+    const sortedVideos = videos
       .filter((video): video is Video => video !== null)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Calculate pagination
+    const total = sortedVideos.length;
+    if (limit) {
+      const start = (page - 1) * limit;
+      const end = start + limit;
+      return {
+        videos: sortedVideos.slice(start, end),
+        total
+      };
+    }
+
+    return {
+      videos: sortedVideos,
+      total
+    };
   } catch (error) {
     console.error('Failed to get videos:', error);
-    return [];
+    return { videos: [], total: 0 };
   }
 }
 

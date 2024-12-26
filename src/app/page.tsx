@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home(): Promise<ReactElement> {
-  const videos = await getAllVideos();
+  const { videos } = await getAllVideos(10);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -39,9 +39,11 @@ export default async function Home(): Promise<ReactElement> {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="mb-8 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-[#0F0F0F] dark:text-white">Latest Clips</h2>
-            <div className="flex gap-2">
-              {/* Filter buttons could go here */}
-            </div>
+            {videos.length >= 10 && (
+              <Link href="/browse" className="text-[#5865F2] hover:underline">
+                View All Clips →
+              </Link>
+            )}
           </div>
 
           {videos.length > 0 ? (
