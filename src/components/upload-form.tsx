@@ -118,7 +118,7 @@ export function UploadForm(): React.ReactElement {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div
         {...getRootProps()}
-        className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`form relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           isDragActive
             ? 'border-primary bg-primary/5'
             : 'border-border hover:border-primary/50 hover:bg-accent/5'
