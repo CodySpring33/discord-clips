@@ -9,6 +9,8 @@
   --background-dark: #0F0F0F;
   --background-secondary-light: #F9F9F9;
   --background-secondary-dark: #1A1B26;
+  --background-tertiary-dark: #3b3d4e;
+  --background-tertiary-light: #afafaf;
   --text-primary-light: #0F0F0F;
   --text-primary-dark: #FFFFFF;
   --text-secondary-light: #606060;
@@ -120,4 +122,9 @@
 
 .toast-warning {
   @apply bg-[#FEE75C] text-[#0F0F0F];
+}
+
+.form:hover{
+  @apply bg-[--background-tertiary-light] dark:bg-[--background-tertiary-dark];
+  cursor: pointer;
 }
