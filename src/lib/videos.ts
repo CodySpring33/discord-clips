@@ -1,5 +1,6 @@
 import { kv } from '@vercel/kv';
 import { deleteObject } from '@/lib/storage';
+import { unstable_cache } from 'next/cache';
 
 export interface Video {
   id: string;
@@ -14,6 +15,37 @@ export interface Video {
   duration?: string;
   author?: string;
 }
+
+// Cache the video IDs for 1 minute
+const getCachedVideoIds = unstable_cache(
+  async () => {
+    return kv.smembers('video_ids');
+  },
+  ['video_ids'],
+  { revalidate: 60 }
+);
+
+// Cache individual videos for 1 minute
+const getCachedVideo = unstable_cache(
+  async (id: string) => {
+    try {
+      // Try to get video in JSON format
+      let video = await kv.get<Video>(`video:${id}`);
+      
+      // If not found, try to migrate from hash format
+      if (!video) {
+        video = await migrateHashToJson(id);
+      }
+      
+      return video;
+    } catch (err) {
+      console.error(`Failed to get video ${id}:`, err);
+      return null;
+    }
+  },
+  ['video'],
+  { revalidate: 60 }
+);
 
 async function migrateHashToJson(id: string): Promise<Video | null> {
   try {
@@ -51,31 +83,16 @@ async function migrateHashToJson(id: string): Promise<Video | null> {
 
 export async function getAllVideos(limit?: number, page: number = 1): Promise<{ videos: Video[]; total: number }> {
   try {
-    // Get all video IDs
-    const videoIds = await kv.smembers('video_ids');
+    // Get all video IDs from cache
+    const videoIds = await getCachedVideoIds();
     
     if (!Array.isArray(videoIds) || !videoIds.length) {
       return { videos: [], total: 0 };
     }
 
-    // Get all videos in parallel
+    // Get all videos in parallel using cache
     const videos = await Promise.all(
-      videoIds.map(async (id) => {
-        try {
-          // Try to get video in JSON format
-          let video = await kv.get<Video>(`video:${id}`);
-          
-          // If not found, try to migrate from hash format
-          if (!video) {
-            video = await migrateHashToJson(id);
-          }
-          
-          return video;
-        } catch (err) {
-          console.error(`Failed to get video ${id}:`, err);
-          return null;
-        }
-      })
+      videoIds.map(id => getCachedVideo(id))
     );
 
     // Filter out any null values and sort by date
@@ -105,20 +122,7 @@ export async function getAllVideos(limit?: number, page: number = 1): Promise<{ 
 }
 
 export async function getVideo(id: string): Promise<Video | null> {
-  try {
-    // Try to get video in JSON format
-    let video = await kv.get<Video>(`video:${id}`);
-    
-    // If not found, try to migrate from hash format
-    if (!video) {
-      video = await migrateHashToJson(id);
-    }
-    
-    return video;
-  } catch (error) {
-    console.error('Failed to get video:', error);
-    return null;
-  }
+  return getCachedVideo(id);
 }
 
 export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Promise<Video> {
@@ -134,6 +138,13 @@ export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Pr
     
     // Add the ID to the set of all video IDs
     await kv.sadd('video_ids', video.id);
+
+    // Revalidate the caches
+    await Promise.all([
+      getCachedVideoIds.revalidate(),
+      getCachedVideo.revalidate(video.id)
+    ]);
+
     return newVideo;
   } catch (error) {
     console.error('Failed to create video:', error);
@@ -146,7 +157,7 @@ export async function incrementViews(id: string): Promise<void> {
     console.log(`Incrementing views for video ${id}`);
     
     // Get current video
-    const video = await kv.get<Video>(`video:${id}`);
+    const video = await getVideo(id);
     if (!video) {
       console.error(`Video ${id} not found when trying to increment views`);
       throw new Error('Video not found');
@@ -159,6 +170,10 @@ export async function incrementViews(id: string): Promise<void> {
     };
 
     await kv.set(`video:${id}`, updatedVideo);
+    
+    // Revalidate the cache for this video
+    await getCachedVideo.revalidate(id);
+    
     console.log(`Successfully incremented views for video ${id}. New view count:`, updatedVideo.views);
   } catch (error) {
     console.error(`Failed to increment views for video ${id}:`, error);
@@ -180,6 +195,12 @@ export async function deleteVideo(id: string): Promise<void> {
     // Delete from KV
     await kv.del(`video:${id}`);
     await kv.srem('video_ids', id);
+
+    // Revalidate the caches
+    await Promise.all([
+      getCachedVideoIds.revalidate(),
+      getCachedVideo.revalidate(id)
+    ]);
   } catch (error) {
     console.error('Failed to delete video:', error);
     throw error;

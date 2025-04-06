@@ -15,7 +15,7 @@
     "@types/node-fetch": "^2.6.12",
     "@vercel/analytics": "^1.4.1",
     "@vercel/kv": "^3.0.0",
-    "canvas": "^3.0.0",
+    "@napi-rs/canvas": "^0.1.40",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "fluent-ffmpeg": "^2.1.3",
