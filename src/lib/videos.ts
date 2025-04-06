@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv';
 import { deleteObject } from '@/lib/storage';
-import { unstable_cache } from 'next/cache';
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 export interface Video {
   id: string;
@@ -141,8 +141,8 @@ export async function createVideo(video: Omit<Video, 'views' | 'createdAt'>): Pr
 
     // Revalidate the caches
     await Promise.all([
-      getCachedVideoIds.revalidate(),
-      getCachedVideo.revalidate(video.id)
+      revalidateTag('video_ids'),
+      revalidateTag(`video:${video.id}`)
     ]);
 
     return newVideo;
@@ -172,7 +172,7 @@ export async function incrementViews(id: string): Promise<void> {
     await kv.set(`video:${id}`, updatedVideo);
     
     // Revalidate the cache for this video
-    await getCachedVideo.revalidate(id);
+    await revalidateTag(`video:${id}`);
     
     console.log(`Successfully incremented views for video ${id}. New view count:`, updatedVideo.views);
   } catch (error) {
@@ -198,8 +198,8 @@ export async function deleteVideo(id: string): Promise<void> {
 
     // Revalidate the caches
     await Promise.all([
-      getCachedVideoIds.revalidate(),
-      getCachedVideo.revalidate(id)
+      revalidateTag('video_ids'),
+      revalidateTag(`video:${id}`)
     ]);
   } catch (error) {
     console.error('Failed to delete video:', error);
