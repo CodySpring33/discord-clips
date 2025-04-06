@@ -36,7 +36,11 @@ const s3Client = isServer
         accessKeyId: requiredEnvVars.AWS_ACCESS_KEY_ID,
         secretAccessKey: requiredEnvVars.AWS_SECRET_ACCESS_KEY,
       },
-      maxAttempts: 3, // Add retry logic
+      maxAttempts: 5,
+      requestHandler: {
+        timeout: 10000, // 10 seconds timeout
+      },
+      retryMode: 'adaptive',
     })
   : null;
 
